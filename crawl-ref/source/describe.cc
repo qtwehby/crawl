@@ -1,3 +1,5 @@
+// clang-format off
+
 /**
  * @file
  * @brief Functions used to print information about various game objects.
@@ -6006,20 +6008,63 @@ static string _monster_current_target_description(const monster_info &mi)
     if (mi.is(MB_ALLY_TARGET))
     {
         auto allies = find_allies_targeting(*m);
-        if (allies.size() == 1)
+        
+        // Group vine segments and other segments by their parent/type
+        map<pair<monster_type, mid_t>, vector<monster*>> grouped;
+        
+        for (monster *ally : allies)
+        {
+            monster_type type = ally->type;
+            mid_t parent_id = MID_NOBODY;
+            
+            // For vine segments and tentacle segments, group by parent
+            if (type == MONS_SNAPLASHER_VINE_SEGMENT || 
+                mons_is_tentacle_segment(type))
+            {
+                // Get the parent/base monster
+                if (ally->props.exists("base_monster"))
+                    parent_id = ally->props["base_monster"].get_int();
+            }
+            
+            grouped[make_pair(type, parent_id)].push_back(ally);
+        }
+        
+        // Build the targeting description with grouping
+        vector<string> targeting_descs;
+        for (const auto &entry : grouped)
+        {
+            const auto &monsters = entry.second;
+            monster_type type = entry.first.first;
+            
+            if (monsters.size() > 1)
+            {
+                // Group multiple segments into one line
+                string name = pluralise_monster(mons_type_name(type, DESC_PLAIN));
+                targeting_descs.push_back(
+                    make_stringf("%d %s", (int)monsters.size(), name.c_str()));
+            }
+            else
+            {
+                // Single monster, use normal description
+                targeting_descs.push_back(monsters[0]->name(DESC_A));
+            }
+        }
+        
+        // Display the grouped targeting list
+        if (targeting_descs.size() == 1)
         {
             result << uppercase_first(pronoun) << " "
                    << conjugate_verb("are", plural)
                    << " currently targeted by "
-                   << allies[0]->name(DESC_YOUR) << ".\n";
+                   << targeting_descs[0] << ".\n";
         }
         else
         {
             result << uppercase_first(pronoun) << " "
                    << conjugate_verb("are", plural)
                    << " currently targeted by:\n";
-            for (auto *a : allies)
-                result << "  " << a->name(DESC_YOUR) << "\n";
+            for (const auto &desc : targeting_descs)
+                result << "  " << desc << "\n";
         }
     }
 
