@@ -68,6 +68,9 @@ command_type describe_item_popup(const item_def &item,
                                  bool do_actions = false);
 bool describe_item(item_def &item, function<void (string&)> fixup_desc = nullptr,
     bool do_actions = true);
+bool describe_item_with_stats(item_def &item,
+                              std::function<void (std::string&)> fixup_desc = nullptr,
+                              bool do_actions = true);
 string describe_item_rarity(const item_def &item);
 void get_item_desc(const item_def &item, describe_info &inf);
 void inscribe_item(item_def &item);

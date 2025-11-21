@@ -2062,6 +2062,69 @@ static string _equipment_property_change(const item_def &item)
     return description;
 }
 
+static string _describe_player_adjusted_weapon_stats(const item_def &item)
+{
+    string description;
+
+    description.reserve(200);
+
+    description = "";
+
+    // item_attack_skill() will return the correct skill for weapons.
+    skill_type sk = item_attack_skill(item);
+
+    description += make_stringf("\nSTR: %d   DEX: %d",
+                                you.strength(), you.dex());
+
+    description += make_stringf("\nYour effective %s skill: %.1f",
+                                skill_name(sk),
+                                you.skill(sk, 10) / 10.0f);
+
+    const int delay = _get_delay(item); // scaled by 10
+    description += make_stringf("\nYour adjusted attack delay: %.1f",
+                                (float)delay / 10.0f);
+
+    // Calculate complete to-hit value (referenced from attack::calc_pre_roll_to_hit).
+    int total_hit = 15 + (you.dex() / 2);
+    total_hit += you.skill(SK_FIGHTING);
+    
+    // Weapon skill contribution
+    if (sk != SK_FIGHTING)
+        total_hit += you.skill(sk);
+    else if (you.form_uses_xl())
+        total_hit += you.experience_level;
+
+    // Weapon bonuses
+    if (item.base_type == OBJ_WEAPONS || item.base_type == OBJ_STAVES)
+    {
+        if (item.is_identified())
+            total_hit += item.plus;
+        total_hit += property(item, PWPN_HIT);
+    }
+
+    // Slaying bonus and status effects
+    total_hit += slaying_bonus(false, false);
+    if (you.duration[DUR_VERTIGO])
+        total_hit -= 5;
+    if (you.get_mutation_level(MUT_EYEBALLS))
+        total_hit += 2 * you.get_mutation_level(MUT_EYEBALLS) + 1;
+
+    description += make_stringf("\nYour approximate total to-hit: %d", total_hit);
+
+    int rating_value = 0;
+    const string rating_str = damage_rating(&item, &rating_value);
+    if (!rating_str.empty())
+        description += "\nDamage rating: " + rating_str;
+
+    if (rating_value > 0 && delay > 0)
+    {
+        const float dpt = (float)rating_value / ((float)delay / 10.0f);
+        description += make_stringf("\nApprox. damage per turn: %.2f", dpt);
+    }
+
+    return description;
+}
+
 static string _describe_weapon(const item_def &item, bool verbose, bool monster)
 {
     string description;
@@ -4132,6 +4195,25 @@ command_type describe_item_popup(const item_def &item,
 bool describe_item(item_def &item, function<void (string&)> fixup_desc, bool do_actions)
 {
     command_type action = describe_item_popup(item, fixup_desc, do_actions);
+    return _do_action(item, action);
+}
+
+bool describe_item_with_stats(item_def &item, function<void (string&)> fixup_desc, bool do_actions)
+{
+    auto add_weapon_stats = [&](string& desc)
+    {
+        if (fixup_desc)
+            fixup_desc(desc);
+        if (item.base_type == OBJ_WEAPONS)
+        {
+            string weapon_stats = _describe_player_adjusted_weapon_stats(item);
+            if (!weapon_stats.empty())
+            {
+                desc += "\n\n<lightblue>--- Player-adjusted weapon stats ---</lightblue>\n" + weapon_stats;
+            }
+        }
+    };
+    command_type action = describe_item_popup(item, add_weapon_stats, do_actions);
     return _do_action(item, action);
 }
 

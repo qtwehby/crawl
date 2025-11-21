@@ -541,7 +541,11 @@ bool InvMenu::examine_index(int i)
         // if your items come from somewhere else, or this will cause crashes!
         const int invidx = ie->item->link;
         ASSERT(you.inv[invidx].defined());
-        return describe_item(you.inv[invidx], nullptr, do_actions);
+        // if the item we're describing is a weapon, jump into new custom function with adjusted stats. otherwise, use normal popup.
+        if (you.inv[invidx].base_type == OBJ_WEAPONS) 
+            return describe_item_with_stats(you.inv[invidx], nullptr, do_actions);
+        else 
+            return describe_item(you.inv[invidx], nullptr, do_actions);
     }
     // nothing to describe, ignore
     return true;
